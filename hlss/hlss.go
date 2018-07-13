@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/Matrix86/flowdownloader/downloader"
 	"github.com/Matrix86/flowdownloader/utils"
 )
 
-var resolutionRegex = regexp.MustCompile("#EXT-X-STREAM-INF:.*,RESOLUTION=([0-9]+x[0-9]+)")
 var keyRegex = regexp.MustCompile("#EXT-X-KEY:METHOD=AES-128,URI=\"([^\"]+)\",IV=(0x[a-f0-9]+)")
 
 type DecryptCallback func(string)
@@ -29,6 +29,8 @@ type Hlss struct {
 	resolutions       map[string]string
 	res_keys          []string
 	secondary_url     string
+	bandwidths        map[string]string
+	bandwidth_keys    []string
 	download_callback downloader.Callback
 	decrypt_callback  DecryptCallback
 	download_worker   int
@@ -67,18 +69,42 @@ func (h *Hlss) parseMainIndex() error {
 
 	var currentResolution string
 	var resolution_keys []string
+	var currentBandwidth string
+	firstLine := true
 
 	for scanner.Scan() {
-		if currentResolution != "" {
-			resolution_keys = append(resolution_keys, currentResolution)
-			h.resolutions[currentResolution] = scanner.Text()
-			currentResolution = ""
+		line := scanner.Text()
+		if firstLine && !strings.HasPrefix(line, "#EXTM3U") {
+			return errors.New("Invalid m3u file format")
 		} else {
-			for index, match := range resolutionRegex.FindStringSubmatch(scanner.Text()) {
-				if index == 1 {
-					currentResolution = match
+			firstLine = false
+		}
+
+		if strings.HasPrefix(line, "#EXT-X-STREAM-INF") {
+			line = line[len("#EXT-X-STREAM-INF:"):]
+
+			params := strings.Split(line, ",")
+			if len(params) < 2 {
+				return errors.New("Invalid m3u file format")
+			}
+			for _, info := range params {
+				if strings.HasPrefix(info, "BANDWIDTH=") {
+					currentBandwidth = info[len("BANDWIDTH="):]
+				} else if strings.HasPrefix(info, "RESOLUTION=") {
+					currentResolution = info[len("RESOLUTION="):]
 				}
 			}
+		} else if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		} else if currentBandwidth != "" || currentResolution != "" {
+			currentTrack := currentBandwidth
+			if currentResolution != "" {
+				currentTrack = "[" + currentResolution + "] " + currentTrack
+			}
+			resolution_keys = append(resolution_keys, currentTrack)
+			h.resolutions[currentTrack] = scanner.Text()
+			currentResolution = ""
+			currentBandwidth = ""
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -204,4 +230,8 @@ func (h *Hlss) SetResolution(res_idx int) error {
 
 func (h *Hlss) GetTotSegments() int {
 	return len(h.segments)
+}
+
+func (h *Hlss) GetBandwidths() []string {
+	return h.bandwidth_keys
 }

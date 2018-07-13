@@ -58,7 +58,7 @@ func main() {
 
 	resolutions := h.GetResolutions()
 
-	fmt.Println("Choose resolution:")
+	fmt.Println("Choose resolution/bandwidth:")
 	for i, k := range resolutions {
 		fmt.Printf(" %d) %s\n", i, k)
 	}
