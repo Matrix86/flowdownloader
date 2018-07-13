@@ -25,7 +25,7 @@ func decrypt_callback(file string) {
 		fmt.Printf("\n")
 	}
 	decrypted++
-	fmt.Printf("\r[@] Decrypted %d/%d", decrypted, segments)
+	fmt.Printf("\r[@] Decrypting %d/%d", decrypted, segments)
 }
 
 func download_callback(file string) {
