@@ -26,6 +26,9 @@ or to cross compile from Linux to Windows
             Output File (default "video.mp4")
       -u string
             Url m3u8
+      -w int
+            Number of workers to download the segments (default 4)
+
 
 ## Example
 
