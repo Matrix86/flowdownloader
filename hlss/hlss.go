@@ -31,15 +31,17 @@ type Hlss struct {
 	secondary_url     string
 	download_callback downloader.Callback
 	decrypt_callback  DecryptCallback
+	download_worker   int
 }
 
-func New(main_url string, key []byte, outputfile string, download_callback downloader.Callback, decrypt_callback DecryptCallback) (*Hlss, error) {
+func New(main_url string, key []byte, outputfile string, download_callback downloader.Callback, decrypt_callback DecryptCallback, download_worker int) (*Hlss, error) {
 	obj := Hlss{
 		main_idx:          main_url,
 		key:               key,
 		file:              outputfile,
 		download_callback: download_callback,
 		decrypt_callback:  decrypt_callback,
+		download_worker:   download_worker,
 	}
 
 	obj.resolutions = make(map[string]string)
@@ -131,7 +133,7 @@ func (h *Hlss) parseSecondaryIndex() error {
 }
 
 func (h *Hlss) downloadSegments() error {
-	d := downloader.New(4, ".", h.download_callback)
+	d := downloader.New(h.download_worker, ".", h.download_callback)
 	d.SetUrls(h.segments)
 	d.StartDownload()
 

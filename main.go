@@ -12,6 +12,7 @@ var (
 	aesKey      string
 	url         string
 	resolutions map[string]string
+	dwn_workers int
 	resKeys     []string
 	outFile     string
 	segments    int
@@ -36,6 +37,7 @@ func main() {
 	flag.StringVar(&aesKey, "k", "", "AES key")
 	flag.StringVar(&url, "u", "", "Url m3u8")
 	flag.StringVar(&outFile, "o", "video.mp4", "Output File")
+	flag.IntVar(&dwn_workers, "w", 4, "Number of workers to download the segments")
 
 	flag.Parse()
 
@@ -52,7 +54,7 @@ func main() {
 		binary_key, _ = base64.StdEncoding.DecodeString(aesKey)
 	}
 
-	h, err := hlss.New(url, binary_key, outFile, download_callback, decrypt_callback)
+	h, err := hlss.New(url, binary_key, outFile, download_callback, decrypt_callback, dwn_workers)
 
 	resolutions := h.GetResolutions()
 
