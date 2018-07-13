@@ -6,14 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/Matrix86/flowdownloader/downloader"
 	"github.com/Matrix86/flowdownloader/utils"
 )
-
-var keyRegex = regexp.MustCompile("#EXT-X-KEY:METHOD=AES-128,URI=\"([^\"]+)\",IV=(0x[a-f0-9]+)")
 
 type DecryptCallback func(string)
 
@@ -129,26 +126,43 @@ func (h *Hlss) parseSecondaryIndex() error {
 
 	base_url := utils.GetBaseUrl(h.secondary_url)
 
-	keyParsed := false
+	firstLine := true
+	getSegment := false
+	//keyUrl := ""
+	iv := ""
 	for scanner.Scan() {
-		if keyParsed == false {
-			matches := keyRegex.FindStringSubmatch(scanner.Text())
-			if len(matches) == 3 {
-				//keyUrl = matches[1]
-				str_iv := matches[2]
-				keyParsed = true
+		line := scanner.Text()
+		if firstLine && !strings.HasPrefix(line, "#EXTM3U") {
+			return errors.New("Invalid m3u file format")
+		} else {
+			firstLine = false
+		}
 
-				str_iv = str_iv[2:]
-				h.iv, e = hex.DecodeString(str_iv)
-				if e != nil {
-					return e
+		if strings.HasPrefix(line, "#EXTINF") {
+			getSegment = true
+		} else if strings.HasPrefix(line, "#EXT-X-KEY:") {
+			line = line[len("#EXT-X-KEY:"):]
+
+			params := strings.Split(line, ",")
+			if len(params) < 2 {
+				return errors.New("Invalid m3u file format")
+			}
+			for _, info := range params {
+				if strings.HasPrefix(info, "URI=\"") {
+					//keyUrl = info[len("URI=\"") : len(info)-1]
+				} else if strings.HasPrefix(info, "IV=") {
+					iv = info[len("IV="):]
+					h.iv, e = hex.DecodeString(iv[2:])
+					if e != nil {
+						return e
+					}
 				}
 			}
-		} else {
-			line := scanner.Text()
-			if line[0:1] != "#" {
-				h.segments = append(h.segments, base_url+line)
-			}
+		} else if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		} else if getSegment {
+			h.segments = append(h.segments, base_url+line)
+			getSegment = false
 		}
 	}
 	if e := scanner.Err(); e != nil {
