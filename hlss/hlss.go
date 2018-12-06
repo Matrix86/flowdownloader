@@ -12,7 +12,7 @@ import (
 	"github.com/Matrix86/flowdownloader/utils"
 )
 
-type DecryptCallback func(string)
+type DecryptCallback func(string, int, int)
 
 type Hlss struct {
 	base_url          string
@@ -191,6 +191,7 @@ func (h *Hlss) decryptSegments() error {
 		return err
 	}
 
+	n := 0
 	for _, url := range h.segments {
 		name := utils.GetFileFromUrl(url)
 
@@ -206,9 +207,10 @@ func (h *Hlss) decryptSegments() error {
 		}
 
 		os.Remove(name)
+		n++
 
 		if h.decrypt_callback != nil {
-			h.decrypt_callback(name)
+			h.decrypt_callback(name, n, h.GetTotSegments())
 		}
 	}
 
@@ -219,6 +221,13 @@ func (h *Hlss) decryptSegments() error {
 
 func (h *Hlss) ExtractVideo() error {
 	var err error
+	if h.secondary_url == "" {
+		h.secondary_url = h.main_idx
+		if err = h.parseSecondaryIndex(); err != nil {
+			return err
+		}
+	}
+
 	if err = h.downloadSegments(); err != nil {
 		return err
 	}

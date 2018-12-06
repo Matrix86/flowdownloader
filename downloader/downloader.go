@@ -10,13 +10,15 @@ import (
 	"github.com/Matrix86/flowdownloader/utils"
 )
 
-type Callback func(filename string)
+type Callback func(filename string, done int, total int)
 
 type downloader struct {
 	workers           int
 	jobs              chan string
 	urls              []string
 	path              string
+	done              int
+	total             int
 	wg                sync.WaitGroup
 	download_callback Callback
 }
@@ -53,8 +55,9 @@ func (d *downloader) worker(id int, jobs <-chan string) {
 
 	for j := range jobs {
 		d.downloadFile("./"+utils.GetFileFromUrl(j), j)
+		d.done++
 		if d.download_callback != nil {
-			d.download_callback(j)
+			d.download_callback(j, d.done, d.total)
 		}
 	}
 }
@@ -73,6 +76,7 @@ func New(workers int, path string, clb Callback) *downloader {
 
 func (d *downloader) SetUrls(urls []string) {
 	d.urls = urls
+	d.total = len(urls)
 }
 
 func (d *downloader) StartDownload() error {

@@ -9,35 +9,39 @@ import (
 )
 
 var (
-	aesKey      string
-	url         string
-	resolutions map[string]string
-	dwn_workers int
-	resKeys     []string
-	outFile     string
-	segments    int
-	downloaded  int
-	decrypted   int
+	aesKey       string
+	url          string
+	resolutions  map[string]string
+	dwn_workers  int
+	resKeys      []string
+	outFile      string
+	segments     int
+	downloaded   int
+	decrypted    int
+	is_secondary bool
+
+	h *hlss.Hlss
 )
 
-func decrypt_callback(file string) {
+func decrypt_callback(file string, done int, total int) {
 	if decrypted == 0 {
 		fmt.Printf("\n")
 	}
 	decrypted++
-	fmt.Printf("\r[@] Decrypting %d/%d", decrypted, segments)
+	fmt.Printf("\r[@] Decrypting %d/%d", done, total)
 }
 
-func download_callback(file string) {
+func download_callback(file string, done int, total int) {
 	downloaded++
-	fmt.Printf("\r[@] Downloading %d/%d", downloaded, segments)
+	fmt.Printf("\r[@] Downloading %d/%d", done, total)
 }
 
 func main() {
 	flag.StringVar(&aesKey, "k", "", "AES key")
-	flag.StringVar(&url, "u", "", "Url m3u8")
+	flag.StringVar(&url, "u", "", "Url master m3u8")
 	flag.StringVar(&outFile, "o", "video.mp4", "Output File")
 	flag.IntVar(&dwn_workers, "w", 4, "Number of workers to download the segments")
+	flag.BoolVar(&is_secondary, "s", false, "If true the url used on -u parameter will be considered as the secondary index url.")
 
 	flag.Parse()
 
@@ -55,31 +59,37 @@ func main() {
 	}
 
 	h, err := hlss.New(url, binary_key, outFile, download_callback, decrypt_callback, dwn_workers)
-
-	resolutions := h.GetResolutions()
-
-	fmt.Println("Choose resolution/bandwidth:")
-	for i, k := range resolutions {
-		fmt.Printf(" %d) %s\n", i, k)
-	}
-
-	fmt.Print("> ")
-	var i int
-	_, err = fmt.Scanf("%d", &i)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("[!] Error: %s\n", err)
 		return
 	}
 
-	if err = h.SetResolution(i); err != nil {
-		fmt.Printf("[!] Error : %s\n", err)
-		return
+	if is_secondary == false {
+		resolutions := h.GetResolutions()
+		fmt.Println("Choose resolution/bandwidth:")
+		for i, k := range resolutions {
+			fmt.Printf(" %d) %s\n", i, k)
+		}
+
+		fmt.Print("> ")
+		var i int
+		_, err = fmt.Scanf("%d", &i)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		if err = h.SetResolution(i); err != nil {
+			fmt.Printf("[!] Error : %s\n", err)
+			return
+		}
 	}
 
 	downloaded = 0
 	decrypted = 0
 	segments = h.GetTotSegments()
 
+	fmt.Println("[@] Starting download...\n")
 	if err = h.ExtractVideo(); err != nil {
 		fmt.Printf("\n[!] Error : %s\n", err)
 	} else {
