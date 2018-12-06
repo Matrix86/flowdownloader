@@ -72,7 +72,7 @@ func (h *Hlss) parseMainIndex() error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if firstLine && !strings.HasPrefix(line, "#EXTM3U") {
-			return errors.New("Invalid m3u file format")
+			return errors.New("parseMainIndex: Invalid m3u file format")
 		} else {
 			firstLine = false
 		}
@@ -133,7 +133,7 @@ func (h *Hlss) parseSecondaryIndex() error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if firstLine && !strings.HasPrefix(line, "#EXTM3U") {
-			return errors.New("Invalid m3u file format")
+			return errors.New("parseSecondaryIndex: Invalid m3u file format")
 		} else {
 			firstLine = false
 		}
@@ -161,7 +161,11 @@ func (h *Hlss) parseSecondaryIndex() error {
 		} else if strings.HasPrefix(line, "#") || line == "" {
 			continue
 		} else if getSegment {
-			h.segments = append(h.segments, base_url+line)
+			if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
+				h.segments = append(h.segments, line)
+			} else {
+				h.segments = append(h.segments, base_url+line)
+			}
 			getSegment = false
 		}
 	}
@@ -235,7 +239,11 @@ func (h *Hlss) SetResolution(res_idx int) error {
 		return errors.New("Resolution not found")
 	}
 
-	h.secondary_url = h.base_url + h.resolutions[h.res_keys[res_idx]]
+	if strings.HasPrefix(h.resolutions[h.res_keys[res_idx]], "http://") || strings.HasPrefix(h.resolutions[h.res_keys[res_idx]], "https://") {
+		h.secondary_url = h.resolutions[h.res_keys[res_idx]]
+	} else {
+		h.secondary_url = h.base_url + h.resolutions[h.res_keys[res_idx]]
+	}
 
 	err := h.parseSecondaryIndex()
 
