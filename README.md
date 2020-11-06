@@ -28,6 +28,8 @@ or to cross compile from Linux to Windows
             Url m3u8
       -w int
             Number of workers to download the segments (default 4)
+      -s bool
+            If true the url used on -u parameter will be considered as the secondary index url. (default false)
 
 
 ## Example

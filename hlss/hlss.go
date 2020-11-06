@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -15,32 +16,33 @@ import (
 type DecryptCallback func(string, int, int)
 
 type Hlss struct {
-	base_url          string
-	key               []byte
-	iv                []byte
-	main_idx          string
-	secondary_idx     []string
-	segments          []string
-	file              string
-	pout              *os.File
-	resolutions       map[string]string
-	res_keys          []string
-	secondary_url     string
-	bandwidths        map[string]string
-	bandwidth_keys    []string
-	download_callback downloader.Callback
-	decrypt_callback  DecryptCallback
-	download_worker   int
+	baseUrl          string
+	key              []byte
+	iv               []byte
+	mainIdx          string
+	secondaryIdx     []string
+	segments         []string
+	file             string
+	pout             *os.File
+	resolutions      map[string]string
+	resKeys          []string
+	secondaryUrl     string
+	bandwidths       map[string]string
+	bandwidthKeys    []string
+	downloadCallback downloader.Callback
+	decryptCallback  DecryptCallback
+	downloadWorker   int
+	cookies          []*http.Cookie
 }
 
-func New(main_url string, key []byte, outputfile string, download_callback downloader.Callback, decrypt_callback DecryptCallback, download_worker int) (*Hlss, error) {
+func New(mainUrl string, key []byte, outputfile string, downloadCallback downloader.Callback, decryptCallback DecryptCallback, downloadWorker int) (*Hlss, error) {
 	obj := Hlss{
-		main_idx:          main_url,
-		key:               key,
-		file:              outputfile,
-		download_callback: download_callback,
-		decrypt_callback:  decrypt_callback,
-		download_worker:   download_worker,
+		mainIdx:          mainUrl,
+		key:              key,
+		file:             outputfile,
+		downloadCallback: downloadCallback,
+		decryptCallback:  decryptCallback,
+		downloadWorker:   downloadWorker,
 	}
 
 	obj.resolutions = make(map[string]string)
@@ -48,24 +50,33 @@ func New(main_url string, key []byte, outputfile string, download_callback downl
 		return nil, err
 	}
 
-	obj.base_url = utils.GetBaseUrl(main_url)
+	obj.baseUrl = utils.GetBaseUrl(mainUrl)
 
 	return &obj, nil
 }
 
 func (h *Hlss) parseMainIndex() error {
-	r, err := http.Get(h.main_idx)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", h.mainIdx, nil)
 	if err != nil {
 		return err
 	}
+	if len(h.cookies) > 0 {
+		for _, c := range h.cookies {
+			req.AddCookie(c)
+		}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
-	defer r.Body.Close()
-
-	scanner := bufio.NewScanner(r.Body)
+	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 
 	var currentResolution string
-	var resolution_keys []string
+	var resolutionKeys []string
 	var currentBandwidth string
 	firstLine := true
 
@@ -98,7 +109,7 @@ func (h *Hlss) parseMainIndex() error {
 			if currentResolution != "" {
 				currentTrack = "[" + currentResolution + "] " + currentTrack
 			}
-			resolution_keys = append(resolution_keys, currentTrack)
+			resolutionKeys = append(resolutionKeys, currentTrack)
 			h.resolutions[currentTrack] = scanner.Text()
 			currentResolution = ""
 			currentBandwidth = ""
@@ -108,23 +119,32 @@ func (h *Hlss) parseMainIndex() error {
 		return err
 	}
 
-	h.res_keys = resolution_keys
+	h.resKeys = resolutionKeys
 
 	return nil
 }
 
 func (h *Hlss) parseSecondaryIndex() error {
-	r, e := http.Get(h.secondary_url)
-	if e != nil {
-		return e
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", h.secondaryUrl, nil)
+	if err != nil {
+		return err
 	}
+	if len(h.cookies) > 0 {
+		for _, c := range h.cookies {
+			req.AddCookie(c)
+		}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
-	defer r.Body.Close()
-
-	scanner := bufio.NewScanner(r.Body)
+	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 
-	base_url := utils.GetBaseUrl(h.secondary_url)
+	baseUrl := utils.GetBaseUrl(h.secondaryUrl)
 
 	firstLine := true
 	getSegment := false
@@ -152,9 +172,9 @@ func (h *Hlss) parseSecondaryIndex() error {
 					//keyUrl = info[len("URI=\"") : len(info)-1]
 				} else if strings.HasPrefix(info, "IV=") {
 					iv = info[len("IV="):]
-					h.iv, e = hex.DecodeString(iv[2:])
-					if e != nil {
-						return e
+					h.iv, err = hex.DecodeString(iv[2:])
+					if err != nil {
+						return err
 					}
 				}
 			}
@@ -164,7 +184,7 @@ func (h *Hlss) parseSecondaryIndex() error {
 			if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
 				h.segments = append(h.segments, line)
 			} else {
-				h.segments = append(h.segments, base_url+line)
+				h.segments = append(h.segments, baseUrl+line)
 			}
 			getSegment = false
 		}
@@ -177,8 +197,9 @@ func (h *Hlss) parseSecondaryIndex() error {
 }
 
 func (h *Hlss) downloadSegments() error {
-	d := downloader.New(h.download_worker, ".", h.download_callback)
+	d := downloader.New(h.downloadWorker, ".", h.downloadCallback)
 	d.SetUrls(h.segments)
+	d.SetCookies(h.cookies)
 	d.StartDownload()
 
 	return nil
@@ -209,8 +230,8 @@ func (h *Hlss) decryptSegments() error {
 		os.Remove(name)
 		n++
 
-		if h.decrypt_callback != nil {
-			h.decrypt_callback(name, n, h.GetTotSegments())
+		if h.decryptCallback != nil {
+			h.decryptCallback(name, n, h.GetTotSegments())
 		}
 	}
 
@@ -221,8 +242,8 @@ func (h *Hlss) decryptSegments() error {
 
 func (h *Hlss) ExtractVideo() error {
 	var err error
-	if h.secondary_url == "" {
-		h.secondary_url = h.main_idx
+	if h.secondaryUrl == "" {
+		h.secondaryUrl = h.mainIdx
 		if err = h.parseSecondaryIndex(); err != nil {
 			return err
 		}
@@ -240,18 +261,18 @@ func (h *Hlss) ExtractVideo() error {
 }
 
 func (h *Hlss) GetResolutions() []string {
-	return h.res_keys
+	return h.resKeys
 }
 
 func (h *Hlss) SetResolution(res_idx int) error {
-	if res_idx >= len(h.res_keys) {
+	if res_idx >= len(h.resKeys) {
 		return errors.New("Resolution not found")
 	}
 
-	if strings.HasPrefix(h.resolutions[h.res_keys[res_idx]], "http://") || strings.HasPrefix(h.resolutions[h.res_keys[res_idx]], "https://") {
-		h.secondary_url = h.resolutions[h.res_keys[res_idx]]
+	if strings.HasPrefix(h.resolutions[h.resKeys[res_idx]], "http://") || strings.HasPrefix(h.resolutions[h.resKeys[res_idx]], "https://") {
+		h.secondaryUrl = h.resolutions[h.resKeys[res_idx]]
 	} else {
-		h.secondary_url = h.base_url + h.resolutions[h.res_keys[res_idx]]
+		h.secondaryUrl = h.baseUrl + h.resolutions[h.resKeys[res_idx]]
 	}
 
 	err := h.parseSecondaryIndex()
@@ -264,5 +285,16 @@ func (h *Hlss) GetTotSegments() int {
 }
 
 func (h *Hlss) GetBandwidths() []string {
-	return h.bandwidth_keys
+	return h.bandwidthKeys
+}
+
+func (h *Hlss) SetCookies(cookieFile string) error {
+	if cookieFile != "" {
+		cookies, err := utils.ParseCookieFile(cookieFile)
+		if err != nil {
+			return fmt.Errorf("cannot parse cookie file: %s", err)
+		}
+		h.cookies = cookies
+	}
+	return nil
 }

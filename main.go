@@ -9,21 +9,18 @@ import (
 )
 
 var (
-	aesKey       string
-	url          string
-	resolutions  map[string]string
-	dwn_workers  int
-	resKeys      []string
-	outFile      string
-	segments     int
-	downloaded   int
-	decrypted    int
-	is_secondary bool
-
-	h *hlss.Hlss
+	aesKey      string
+	url         string
+	cookieFile  string
+	dwnWorkers  int
+	outFile     string
+	segments    int
+	downloaded  int
+	decrypted   int
+	isSecondary bool
 )
 
-func decrypt_callback(file string, done int, total int) {
+func decryptCallback(file string, done int, total int) {
 	if decrypted == 0 {
 		fmt.Printf("\n")
 	}
@@ -31,7 +28,7 @@ func decrypt_callback(file string, done int, total int) {
 	fmt.Printf("\r[@] Decrypting %d/%d", done, total)
 }
 
-func download_callback(file string, done int, total int) {
+func downloadCallback(file string, done int, total int) {
 	downloaded++
 	fmt.Printf("\r[@] Downloading %d/%d", done, total)
 }
@@ -40,8 +37,9 @@ func main() {
 	flag.StringVar(&aesKey, "k", "", "AES key")
 	flag.StringVar(&url, "u", "", "Url master m3u8")
 	flag.StringVar(&outFile, "o", "video.mp4", "Output File")
-	flag.IntVar(&dwn_workers, "w", 4, "Number of workers to download the segments")
-	flag.BoolVar(&is_secondary, "s", false, "If true the url used on -u parameter will be considered as the secondary index url.")
+	flag.IntVar(&dwnWorkers, "w", 4, "Number of workers to download the segments")
+	flag.BoolVar(&isSecondary, "s", false, "If true the url used on -u parameter will be considered as the secondary index url.")
+	flag.StringVar(&cookieFile, "c", "", "File with authentication cookies.")
 
 	flag.Parse()
 
@@ -51,20 +49,27 @@ func main() {
 		return
 	}
 
-	var binary_key []byte
+	var binaryKey []byte
 	if aesKey == "" {
 		fmt.Println("[@] Warning : AES key is empty")
 	} else {
-		binary_key, _ = base64.StdEncoding.DecodeString(aesKey)
+		binaryKey, _ = base64.StdEncoding.DecodeString(aesKey)
 	}
 
-	h, err := hlss.New(url, binary_key, outFile, download_callback, decrypt_callback, dwn_workers)
+	h, err := hlss.New(url, binaryKey, outFile, downloadCallback, decryptCallback, dwnWorkers)
 	if err != nil {
 		fmt.Printf("[!] Error: %s\n", err)
 		return
 	}
 
-	if is_secondary == false {
+	if cookieFile != "" {
+		if h.SetCookies(cookieFile) != nil {
+			fmt.Printf("[!] Error: %s\n", err)
+			return
+		}
+	}
+
+	if isSecondary == false {
 		resolutions := h.GetResolutions()
 		fmt.Println("Choose resolution/bandwidth:")
 		for i, k := range resolutions {

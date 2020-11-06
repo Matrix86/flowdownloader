@@ -13,14 +13,15 @@ import (
 type Callback func(filename string, done int, total int)
 
 type downloader struct {
-	workers           int
-	jobs              chan string
-	urls              []string
-	path              string
-	done              int
-	total             int
-	wg                sync.WaitGroup
-	download_callback Callback
+	workers          int
+	jobs             chan string
+	urls             []string
+	path             string
+	done             int
+	total            int
+	wg               sync.WaitGroup
+	downloadCallback Callback
+	cookies          []*http.Cookie
 }
 
 //var wg sync.WaitGroup
@@ -35,7 +36,17 @@ func (d *downloader) downloadFile(filepath string, url string) error {
 	defer out.Close()
 
 	// Get the data
-	resp, err := http.Get(url)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	if len(d.cookies) > 0 {
+		for _, c := range d.cookies {
+			req.AddCookie(c)
+		}
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -56,14 +67,14 @@ func (d *downloader) worker(id int, jobs <-chan string) {
 	for j := range jobs {
 		d.downloadFile("./"+utils.GetFileFromUrl(j), j)
 		d.done++
-		if d.download_callback != nil {
-			d.download_callback(j, d.done, d.total)
+		if d.downloadCallback != nil {
+			d.downloadCallback(j, d.done, d.total)
 		}
 	}
 }
 
 func New(workers int, path string, clb Callback) *downloader {
-	d := downloader{workers: workers, path: path, download_callback: clb}
+	d := downloader{workers: workers, path: path, downloadCallback: clb}
 
 	d.jobs = make(chan string, 100)
 	for w := 1; w <= workers; w++ {
@@ -77,6 +88,10 @@ func New(workers int, path string, clb Callback) *downloader {
 func (d *downloader) SetUrls(urls []string) {
 	d.urls = urls
 	d.total = len(urls)
+}
+
+func (d *downloader) SetCookies(cookies []*http.Cookie) {
+	d.cookies = cookies
 }
 
 func (d *downloader) StartDownload() error {
