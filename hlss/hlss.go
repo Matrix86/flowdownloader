@@ -35,7 +35,7 @@ type Hlss struct {
 	cookies          []*http.Cookie
 }
 
-func New(mainUrl string, key []byte, outputfile string, downloadCallback downloader.Callback, decryptCallback DecryptCallback, downloadWorker int) (*Hlss, error) {
+func New(mainUrl string, key []byte, outputfile string, downloadCallback downloader.Callback, decryptCallback DecryptCallback, downloadWorker int, cookieFile string) (*Hlss, error) {
 	obj := Hlss{
 		mainIdx:          mainUrl,
 		key:              key,
@@ -43,6 +43,13 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 		downloadCallback: downloadCallback,
 		decryptCallback:  decryptCallback,
 		downloadWorker:   downloadWorker,
+	}
+
+	if cookieFile != "" {
+		err := obj.setCookies(cookieFile)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	obj.resolutions = make(map[string]string)
@@ -292,7 +299,7 @@ func (h *Hlss) GetBandwidths() []string {
 	return h.bandwidthKeys
 }
 
-func (h *Hlss) SetCookies(cookieFile string) error {
+func (h *Hlss) setCookies(cookieFile string) error {
 	if cookieFile != "" {
 		cookies, err := utils.ParseCookieFile(cookieFile)
 		if err != nil {

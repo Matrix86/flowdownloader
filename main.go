@@ -56,17 +56,10 @@ func main() {
 		binaryKey, _ = base64.StdEncoding.DecodeString(aesKey)
 	}
 
-	h, err := hlss.New(url, binaryKey, outFile, downloadCallback, decryptCallback, dwnWorkers)
+	h, err := hlss.New(url, binaryKey, outFile, downloadCallback, decryptCallback, dwnWorkers, cookieFile)
 	if err != nil {
 		fmt.Printf("[!] Error: %s\n", err)
 		return
-	}
-
-	if cookieFile != "" {
-		if h.SetCookies(cookieFile) != nil {
-			fmt.Printf("[!] Error: %s\n", err)
-			return
-		}
 	}
 
 	if isSecondary == false {
