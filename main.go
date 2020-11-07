@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/Matrix86/flowdownloader/hlss"
 )
@@ -12,8 +13,9 @@ var (
 	aesKey      string
 	url         string
 	cookieFile  string
-	dwnWorkers  int
 	outFile     string
+	referer     string
+	dwnWorkers  int
 	segments    int
 	downloaded  int
 	decrypted   int
@@ -34,12 +36,13 @@ func downloadCallback(file string, done int, total int) {
 }
 
 func main() {
-	flag.StringVar(&aesKey, "k", "", "AES key")
+	flag.StringVar(&aesKey, "k", "", "AES key (base64 encoded or http url)")
 	flag.StringVar(&url, "u", "", "Url master m3u8")
 	flag.StringVar(&outFile, "o", "video.mp4", "Output File")
 	flag.IntVar(&dwnWorkers, "w", 4, "Number of workers to download the segments")
 	flag.BoolVar(&isSecondary, "s", false, "If true the url used on -u parameter will be considered as the secondary index url.")
 	flag.StringVar(&cookieFile, "c", "", "File with authentication cookies.")
+	flag.StringVar(&referer, "r", "", "Set the http referer.")
 
 	flag.Parse()
 
@@ -50,13 +53,18 @@ func main() {
 	}
 
 	var binaryKey []byte
+	var keyUrl string
 	if aesKey == "" {
 		fmt.Println("[@] Warning : AES key is empty")
 	} else {
-		binaryKey, _ = base64.StdEncoding.DecodeString(aesKey)
+		if strings.HasPrefix(aesKey, "http") {
+			keyUrl = aesKey
+		} else {
+			binaryKey, _ = base64.StdEncoding.DecodeString(aesKey)
+		}
 	}
 
-	h, err := hlss.New(url, binaryKey, outFile, downloadCallback, decryptCallback, dwnWorkers, cookieFile)
+	h, err := hlss.New(url, binaryKey, outFile, downloadCallback, decryptCallback, dwnWorkers, cookieFile, referer, keyUrl)
 	if err != nil {
 		fmt.Printf("[!] Error: %s\n", err)
 		return

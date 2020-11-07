@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -33,9 +34,10 @@ type Hlss struct {
 	decryptCallback  DecryptCallback
 	downloadWorker   int
 	cookies          []*http.Cookie
+	referer          string
 }
 
-func New(mainUrl string, key []byte, outputfile string, downloadCallback downloader.Callback, decryptCallback DecryptCallback, downloadWorker int, cookieFile string) (*Hlss, error) {
+func New(mainUrl string, key []byte, outputfile string, downloadCallback downloader.Callback, decryptCallback DecryptCallback, downloadWorker int, cookieFile string, referer string, keyUrl string) (*Hlss, error) {
 	obj := Hlss{
 		mainIdx:          mainUrl,
 		key:              key,
@@ -43,6 +45,7 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 		downloadCallback: downloadCallback,
 		decryptCallback:  decryptCallback,
 		downloadWorker:   downloadWorker,
+		referer:          referer,
 	}
 
 	if cookieFile != "" {
@@ -50,6 +53,35 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Try to get key from URL
+	if keyUrl != "" {
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", keyUrl, nil)
+		if err != nil {
+			return nil, err
+		}
+		if len(obj.cookies) > 0 {
+			for _, c := range obj.cookies {
+				req.AddCookie(c)
+			}
+		}
+		if obj.referer != "" {
+			req.Header.Set("Referer", obj.referer)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		} else if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		}
+		defer resp.Body.Close()
+		buf, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		obj.key = buf
 	}
 
 	obj.resolutions = make(map[string]string)
@@ -72,6 +104,9 @@ func (h *Hlss) parseMainIndex() error {
 		for _, c := range h.cookies {
 			req.AddCookie(c)
 		}
+	}
+	if h.referer != "" {
+		req.Header.Set("Referer", h.referer)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -144,6 +179,9 @@ func (h *Hlss) parseSecondaryIndex() error {
 			req.AddCookie(c)
 		}
 	}
+	if h.referer != "" {
+		req.Header.Set("Referer", h.referer)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -183,6 +221,7 @@ func (h *Hlss) parseSecondaryIndex() error {
 					//keyUrl = info[len("URI=\"") : len(info)-1]
 				} else if strings.HasPrefix(info, "IV=") {
 					iv = info[len("IV="):]
+					fmt.Println("[@] IV FOUND:", iv)
 					h.iv, err = hex.DecodeString(iv[2:])
 					if err != nil {
 						return err
@@ -211,6 +250,7 @@ func (h *Hlss) downloadSegments() error {
 	d := downloader.New(h.downloadWorker, ".", h.downloadCallback)
 	d.SetUrls(h.segments)
 	d.SetCookies(h.cookies)
+	d.SetReferer(h.referer)
 	d.StartDownload()
 
 	return nil

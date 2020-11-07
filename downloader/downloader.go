@@ -23,6 +23,7 @@ type downloader struct {
 	wg               sync.WaitGroup
 	downloadCallback Callback
 	cookies          []*http.Cookie
+	referer          string
 }
 
 //var wg sync.WaitGroup
@@ -46,6 +47,9 @@ func (d *downloader) downloadFile(filepath string, url string) error {
 		for _, c := range d.cookies {
 			req.AddCookie(c)
 		}
+	}
+	if d.referer != "" {
+		req.Header.Set("Referer", d.referer)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -95,6 +99,10 @@ func (d *downloader) SetUrls(urls []string) {
 
 func (d *downloader) SetCookies(cookies []*http.Cookie) {
 	d.cookies = cookies
+}
+
+func (d *downloader) SetReferer(referer string) {
+	d.referer = referer
 }
 
 func (d *downloader) StartDownload() error {
