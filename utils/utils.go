@@ -26,8 +26,6 @@ func AesDecrypt(key []byte, encrypted []byte, iv []byte) (decoded []byte, err er
 		return
 	}
 
-	fmt.Println("aes blocksize: ", block.BlockSize())
-
 	if len(encrypted) < aes.BlockSize {
 		err = errors.New("ciphertext block size is too short")
 		return
