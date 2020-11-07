@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
