@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -49,6 +50,8 @@ func (d *downloader) downloadFile(filepath string, url string) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
+	} else if resp.StatusCode != 200 {
+		return fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 	defer resp.Body.Close()
 

@@ -69,6 +69,8 @@ func (h *Hlss) parseMainIndex() error {
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
+	} else if resp.StatusCode != 200 {
+		return fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 	defer resp.Body.Close()
 
@@ -138,6 +140,8 @@ func (h *Hlss) parseSecondaryIndex() error {
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
+	} else if resp.StatusCode != 200 {
+		return fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 	defer resp.Body.Close()
 
