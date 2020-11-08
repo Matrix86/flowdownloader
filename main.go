@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"github.com/evilsocket/islazy/log"
 	"strings"
 
 	"github.com/Matrix86/flowdownloader/hlss"
@@ -20,19 +21,26 @@ var (
 	downloaded  int
 	decrypted   int
 	isSecondary bool
+	debugFlag   bool
 )
 
 func decryptCallback(file string, done int, total int) {
 	if decrypted == 0 {
 		fmt.Printf("\n")
 	}
+	if decrypted != 0 && log.Level != log.DEBUG {
+		fmt.Print("\033[A")// move cursor up
+	}
 	decrypted++
-	fmt.Printf("\r[@] Decrypting %d/%d", done, total)
+	fmt.Printf("\r[@] Decrypting %d/%d\n", done, total)
 }
 
 func downloadCallback(file string, done int, total int) {
+	if downloaded != 0 && log.Level != log.DEBUG {
+		fmt.Print("\033[A")// move cursor up
+	}
 	downloaded++
-	fmt.Printf("\r[@] Downloading %d/%d", done, total)
+	fmt.Printf("\r[@] Downloading %d/%d\n", done, total)
 }
 
 func main() {
@@ -43,11 +51,21 @@ func main() {
 	flag.BoolVar(&isSecondary, "s", false, "If true the url used on -u parameter will be considered as the secondary index url.")
 	flag.StringVar(&cookieFile, "c", "", "File with authentication cookies.")
 	flag.StringVar(&referer, "r", "", "Set the http referer.")
+	flag.BoolVar(&debugFlag, "debug", false, "Enable debug logs.")
 
 	flag.Parse()
 
+	log.Output = ""
+	log.Level = log.INFO
+	log.OnFatal = log.ExitOnFatal
+	log.Format = "[{datetime}] {level:color}{level:name}{reset} {message}"
+
+	if debugFlag {
+		log.Level = log.DEBUG
+	}
+
 	if url == "" {
-		fmt.Println("Url not setted")
+		log.Error("url not setted...exiting")
 		flag.Usage()
 		return
 	}
@@ -55,7 +73,7 @@ func main() {
 	var binaryKey []byte
 	var keyUrl string
 	if aesKey == "" {
-		fmt.Println("[@] Warning : AES key is empty")
+		log.Warning("AES key is empty")
 	} else {
 		if strings.HasPrefix(aesKey, "http") {
 			keyUrl = aesKey
@@ -66,7 +84,7 @@ func main() {
 
 	h, err := hlss.New(url, binaryKey, outFile, downloadCallback, decryptCallback, dwnWorkers, cookieFile, referer, keyUrl)
 	if err != nil {
-		fmt.Printf("[!] Error: %s\n", err)
+		log.Error("%s", err)
 		return
 	}
 
@@ -81,12 +99,12 @@ func main() {
 		var i int
 		_, err = fmt.Scanf("%d", &i)
 		if err != nil {
-			fmt.Println(err)
+			log.Error("%s", err)
 			return
 		}
 
 		if err = h.SetResolution(i); err != nil {
-			fmt.Printf("[!] Error : %s\n", err)
+			log.Error("resolution selection: %s", err)
 			return
 		}
 	}
@@ -95,10 +113,10 @@ func main() {
 	decrypted = 0
 	segments = h.GetTotSegments()
 
-	fmt.Println("[@] Starting download...\n")
+	log.Info("download is starting...")
 	if err = h.ExtractVideo(); err != nil {
-		fmt.Printf("\n[!] Error : %s\n", err)
+		log.Error("%s", err)
 	} else {
-		fmt.Println("\n[@] Completed")
+		log.Info("download completed")
 	}
 }

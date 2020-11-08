@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/Matrix86/flowdownloader/utils"
+	"github.com/evilsocket/islazy/log"
 )
 
 type Callback func(filename string, done int, total int)
@@ -33,7 +34,7 @@ func (d *downloader) downloadFile(filepath string, url string) error {
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
-		return errors.New(" : downloadFile can't create file : " + err.Error())
+		return errors.New("downloadFile can't create file : " + err.Error())
 	}
 	defer out.Close()
 
@@ -72,7 +73,11 @@ func (d *downloader) worker(id int, jobs <-chan string) {
 	defer d.wg.Done()
 
 	for j := range jobs {
-		d.downloadFile("./"+utils.GetFileFromUrl(j), j)
+		log.Debug("download segment from '%s'", j)
+		err := d.downloadFile("./"+utils.GetFileFromUrl(j), j)
+		if err != nil {
+			log.Error("during segment download: segment='%s': %s", j, err)
+		}
 		d.done++
 		if d.downloadCallback != nil {
 			d.downloadCallback(j, d.done, d.total)

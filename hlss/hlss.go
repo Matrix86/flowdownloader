@@ -12,6 +12,7 @@ import (
 
 	"github.com/Matrix86/flowdownloader/downloader"
 	"github.com/Matrix86/flowdownloader/utils"
+	"github.com/evilsocket/islazy/log"
 )
 
 type DecryptCallback func(string, int, int)
@@ -49,6 +50,7 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 	}
 
 	if cookieFile != "" {
+		log.Debug("parsing cookies")
 		err := obj.setCookies(cookieFile)
 		if err != nil {
 			return nil, err
@@ -57,24 +59,10 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 
 	// Try to get key from URL
 	if keyUrl != "" {
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", keyUrl, nil)
+		log.Debug("getting key from url: '%s'", keyUrl)
+		resp, err := utils.HttpRequest("GET", keyUrl, obj.cookies, obj.referer)
 		if err != nil {
-			return nil, err
-		}
-		if len(obj.cookies) > 0 {
-			for _, c := range obj.cookies {
-				req.AddCookie(c)
-			}
-		}
-		if obj.referer != "" {
-			req.Header.Set("Referer", obj.referer)
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		} else if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+			return nil, fmt.Errorf("http request error: %s", err)
 		}
 		defer resp.Body.Close()
 		buf, err := ioutil.ReadAll(resp.Body)
@@ -90,29 +78,15 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 	}
 
 	obj.baseUrl = utils.GetBaseUrl(mainUrl)
+	log.Debug("base url: '%s'", obj.baseUrl)
 
 	return &obj, nil
 }
 
 func (h *Hlss) parseMainIndex() error {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", h.mainIdx, nil)
+	resp, err := utils.HttpRequest("GET", h.mainIdx, h.cookies, h.referer)
 	if err != nil {
-		return err
-	}
-	if len(h.cookies) > 0 {
-		for _, c := range h.cookies {
-			req.AddCookie(c)
-		}
-	}
-	if h.referer != "" {
-		req.Header.Set("Referer", h.referer)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	} else if resp.StatusCode != 200 {
-		return fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		return fmt.Errorf("http request error: %s", err)
 	}
 	defer resp.Body.Close()
 
@@ -169,24 +143,9 @@ func (h *Hlss) parseMainIndex() error {
 }
 
 func (h *Hlss) parseSecondaryIndex() error {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", h.secondaryUrl, nil)
+	resp, err := utils.HttpRequest("GET", h.secondaryUrl, h.cookies, h.referer)
 	if err != nil {
-		return err
-	}
-	if len(h.cookies) > 0 {
-		for _, c := range h.cookies {
-			req.AddCookie(c)
-		}
-	}
-	if h.referer != "" {
-		req.Header.Set("Referer", h.referer)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	} else if resp.StatusCode != 200 {
-		return fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		return fmt.Errorf("http request error: %s", err)
 	}
 	defer resp.Body.Close()
 
@@ -221,7 +180,7 @@ func (h *Hlss) parseSecondaryIndex() error {
 					//keyUrl = info[len("URI=\"") : len(info)-1]
 				} else if strings.HasPrefix(info, "IV=") {
 					iv = info[len("IV="):]
-					fmt.Println("[@] IV FOUND:", iv)
+					log.Debug("IV found: %s", iv)
 					h.iv, err = hex.DecodeString(iv[2:])
 					if err != nil {
 						return err
@@ -247,6 +206,7 @@ func (h *Hlss) parseSecondaryIndex() error {
 }
 
 func (h *Hlss) downloadSegments() error {
+	log.Debug("downloading segments")
 	d := downloader.New(h.downloadWorker, ".", h.downloadCallback)
 	d.SetUrls(h.segments)
 	d.SetCookies(h.cookies)
@@ -257,6 +217,7 @@ func (h *Hlss) downloadSegments() error {
 }
 
 func (h *Hlss) decryptSegments() error {
+	log.Debug("decrypting segments")
 	pout, err := os.Create(h.file)
 	defer pout.Close()
 	if err != nil {

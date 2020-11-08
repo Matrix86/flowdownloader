@@ -4,7 +4,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -65,4 +67,27 @@ func FileAppend(output *os.File, file string) error {
 	}
 
 	return nil
+}
+
+func HttpRequest(method string, url string, cookies []*http.Cookie, referer string) (*http.Response, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest(method,  url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(cookies) > 0 {
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+	}
+	if referer != "" {
+		req.Header.Set("Referer", referer)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	} else if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("http response status: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+	return resp, nil
 }
