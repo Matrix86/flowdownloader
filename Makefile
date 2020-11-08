@@ -1,7 +1,6 @@
 PROJECT_NAME := "flowdownloader"
 TARGET=flowdownloader
 LDFLAGS="-s -w"
-SHELL := bash
 
 all: build
 
