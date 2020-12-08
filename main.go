@@ -4,7 +4,10 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"github.com/Matrix86/flowdownloader/utils"
 	"github.com/evilsocket/islazy/log"
+	"github.com/evilsocket/islazy/tui"
+	"runtime"
 	"strings"
 
 	"github.com/Matrix86/flowdownloader/hlss"
@@ -54,6 +57,12 @@ func main() {
 	flag.BoolVar(&debugFlag, "debug", false, "Enable debug logs.")
 
 	flag.Parse()
+
+	appName := fmt.Sprintf("%s v%s", utils.Name, utils.Version)
+	appBuild := fmt.Sprintf("(built for %s %s with %s)", runtime.GOOS, runtime.GOARCH, runtime.Version())
+	appAuthor := fmt.Sprintf("Author: %s", utils.Author)
+
+	fmt.Printf("%s %s\n%s\n", tui.Bold(appName), tui.Dim(appBuild), tui.Dim(appAuthor))
 
 	log.Output = ""
 	log.Level = log.INFO
