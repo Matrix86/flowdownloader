@@ -49,7 +49,7 @@ do
 done
 
 # Commit updated file with the new version
-git commit -m "Releasing v$NEW_VERSION"
+git commit -m "Release v$NEW_VERSION"
 git push
 
 # Create TAG on the repository
