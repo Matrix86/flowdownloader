@@ -8,12 +8,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/Matrix86/flowdownloader/downloader"
 	"github.com/Matrix86/flowdownloader/utils"
 	"github.com/evilsocket/islazy/log"
 )
+
+var rKeyUrl = regexp.MustCompile(`URI=\"([^\"]+)\"`)
 
 type DecryptCallback func(string, int, int)
 
@@ -49,6 +52,10 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 		referer:          referer,
 	}
 
+	if referer == "" {
+		obj.referer = utils.GetBaseUrl(mainUrl)
+	}
+
 	if cookieFile != "" {
 		log.Debug("parsing cookies")
 		err := obj.setCookies(cookieFile)
@@ -59,17 +66,10 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 
 	// Try to get key from URL
 	if keyUrl != "" {
-		log.Debug("getting key from url: '%s'", keyUrl)
-		resp, err := utils.HttpRequest("GET", keyUrl, obj.cookies, obj.referer)
-		if err != nil {
-			return nil, fmt.Errorf("http request error: %s", err)
-		}
-		defer resp.Body.Close()
-		buf, err := ioutil.ReadAll(resp.Body)
+		err := obj.retrieveKeyFromURL(keyUrl)
 		if err != nil {
 			return nil, err
 		}
-		obj.key = buf
 	}
 
 	obj.resolutions = make(map[string]string)
@@ -81,6 +81,22 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 	log.Debug("base url: '%s'", obj.baseUrl)
 
 	return &obj, nil
+}
+
+func (h *Hlss) retrieveKeyFromURL(keyUrl string) error {
+	log.Debug("getting key from url: '%s'", keyUrl)
+	resp, err := utils.HttpRequest("GET", keyUrl, h.cookies, h.referer)
+	if err != nil {
+		return fmt.Errorf("http request error: %s", err)
+	}
+	defer resp.Body.Close()
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	log.Debug("key lenght: %d", len(buf))
+	h.key = buf
+	return nil
 }
 
 func (h *Hlss) parseMainIndex() error {
@@ -176,8 +192,15 @@ func (h *Hlss) parseSecondaryIndex() error {
 				return errors.New("Invalid m3u file format")
 			}
 			for _, info := range params {
-				if strings.HasPrefix(info, "URI=\"") {
-					//keyUrl = info[len("URI=\"") : len(info)-1]
+				if h.key == nil && strings.HasPrefix(info, "URI=\"") {
+					match := rKeyUrl.FindStringSubmatch(info)
+					if match != nil && len(match) >= 2 {
+						log.Debug("key URL found: %s", match[1])
+						err := h.retrieveKeyFromURL(match[1])
+						if err != nil {
+							log.Error("retrieving Key from URL: %s", err)
+						}
+					}
 				} else if strings.HasPrefix(info, "IV=") {
 					iv = info[len("IV="):]
 					log.Debug("IV found: %s", iv)
@@ -222,6 +245,11 @@ func (h *Hlss) decryptSegments() error {
 	defer pout.Close()
 	if err != nil {
 		return err
+	}
+
+	if len(h.iv) == 0 {
+		log.Debug("empty IV...")
+		h.iv = make([]byte, len(h.key))
 	}
 
 	n := 0
