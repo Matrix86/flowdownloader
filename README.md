@@ -5,6 +5,8 @@ For example it can download the video showed by FlowPlayer or JW Player.
 
 ![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/flowdownloader.gif)
 
+![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/extension.gif)
+
 ## How it works
 
 You need to find the URL of the main index file with extension `m3u8` and pass it to the tool with the flag `-u`. You can easily find it using the web inspector of your browser.
@@ -53,5 +55,3 @@ Using the Chrome extension is it possible to extract key and URL directly from t
 Once [installed](https://dev.to/ben/how-to-install-chrome-extensions-manually-from-github-1612) you'll find a new tab 
 in the webinspector called "Flowdownloader".
 Open the page with the video, open the WebInspector and go to the `Flowdownloader` tab. Press play on the video and enjoy :)
-
-![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/extension.gif)
