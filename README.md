@@ -45,3 +45,13 @@ A Dockerfile is also present. You can use it to create your build or download it
         	Url master m3u8
       -w int
         	Number of workers to download the segments (default 4)
+
+## Chrome extension
+
+Using the Chrome extension is it possible to extract key and URL directly from the browser.
+
+Once [installed](https://dev.to/ben/how-to-install-chrome-extensions-manually-from-github-1612) you'll find a new tab 
+in the webinspector called "Flowdownloader".
+Open the page with the video, open the WebInspector and go to the `Flowdownloader` tab. Press play on the video and enjoy :)
+
+![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/extension.gif)

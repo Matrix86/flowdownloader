@@ -1,0 +1,23 @@
+{
+	"name": "Flowdowloader",
+	"version": "0.1",
+	"description": "",
+    "manifest_version": 3,
+
+	"devtools_page": "/devtools/devtools-page.html",
+
+	"permissions": [
+        "clipboardWrite"
+    ],
+
+	"host_permissions": [
+        "<all_urls>"
+	],
+
+	"icons": {
+		"36": "images/icon36.png",
+		"48": "images/icon48.png",
+		"72": "images/icon72.png",
+		"144": "images/icon144.png"
+	}
+}
