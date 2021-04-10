@@ -5,7 +5,7 @@ For example it can download the video showed by FlowPlayer or JW Player.
 
 ![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/flowdownloader.gif)
 
-![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/extension.gif)
+![Flowdownloader](https://raw.githubusercontent.com/Matrix86/flowdownloader/master/extension.png)
 
 ## How it works
 
