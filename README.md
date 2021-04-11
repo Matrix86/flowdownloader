@@ -55,3 +55,5 @@ Using the Chrome extension is it possible to extract key and URL directly from t
 Once [installed](https://dev.to/ben/how-to-install-chrome-extensions-manually-from-github-1612) you'll find a new tab 
 in the webinspector called "Flowdownloader".
 Open the page with the video, open the WebInspector and go to the `Flowdownloader` tab. Press play on the video and enjoy :)
+
+Link to Chrome Store [here](https://chrome.google.com/webstore/detail/flowdowloader/dckffaaecljbkgkhongakgbmamfiibmp)
