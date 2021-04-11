@@ -1,5 +1,5 @@
 {
-	"name": "Flowdowloader",
+	"name": "Flowdownloader",
 	"version": "0.2",
 	"description": "This extension show the URLs and Key/IV of the video stream used by HLS (Http Live Streaming) protocol. It allows you to download the video and decrypt it on local using https://github.com/Matrix86/flowdownloader",
     "manifest_version": 3,
