@@ -63,7 +63,9 @@ var ui = new UI();
 
 chrome.devtools.network.onRequestFinished.addListener(
     function(data) {
-        if(data.request.url.endsWith(".m3u8")) {
+        var u = data.request.url.split('?')[0];
+
+        if(u.endsWith(".m3u8")) {
             console.log("request received: ", data.request.url);
             var currentURL = data.request.url;
             

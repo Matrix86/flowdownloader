@@ -18,6 +18,10 @@ func GetBaseUrl(url string) string {
 
 func GetFileFromUrl(url string) string {
 	i := strings.LastIndex(url, "/")
+	j := strings.Index(url, "?")
+	if j != -1 {
+		return url[i+1:j]
+	}
 	return url[i+1:]
 }
 
