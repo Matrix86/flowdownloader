@@ -56,4 +56,6 @@ Once [installed](https://dev.to/ben/how-to-install-chrome-extensions-manually-fr
 in the webinspector called "Flowdownloader".
 Open the page with the video, open the WebInspector and go to the `Flowdownloader` tab. Press play on the video and enjoy :)
 
-Link to Chrome Store [here](https://chrome.google.com/webstore/detail/flowdowloader/dckffaaecljbkgkhongakgbmamfiibmp)
+Link to the Chrome Store [here](https://chrome.google.com/webstore/detail/flowdowloader/dckffaaecljbkgkhongakgbmamfiibmp)
+
+[__Buy me a coffee! :coffee:__](https://www.paypal.com/donate?business=ZT4WUKDKTJA4J&item_name=Donation&currency_code=EUR)
