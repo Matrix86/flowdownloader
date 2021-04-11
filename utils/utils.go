@@ -3,6 +3,8 @@ package utils
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -20,9 +22,14 @@ func GetFileFromUrl(url string) string {
 	i := strings.LastIndex(url, "/")
 	j := strings.Index(url, "?")
 	if j != -1 {
-		return url[i+1:j]
+		return url[i+1 : j]
 	}
 	return url[i+1:]
+}
+
+func GetMD5Hash(text string) string {
+	hash := md5.Sum([]byte(text))
+	return hex.EncodeToString(hash[:])
 }
 
 func AesDecrypt(key []byte, encrypted []byte, iv []byte) (decoded []byte, err error) {
@@ -75,7 +82,7 @@ func FileAppend(output *os.File, file string) error {
 
 func HttpRequest(method string, url string, cookies []*http.Cookie, referer string) (*http.Response, error) {
 	client := &http.Client{}
-	req, err := http.NewRequest(method,  url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
 	}

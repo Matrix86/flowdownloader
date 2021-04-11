@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"sync"
 
 	"github.com/Matrix86/flowdownloader/utils"
@@ -74,7 +75,8 @@ func (d *downloader) worker(id int, jobs <-chan string) {
 
 	for j := range jobs {
 		log.Debug("download segment from '%s'", j)
-		err := d.downloadFile("./"+utils.GetFileFromUrl(j), j)
+		fpath := path.Join(d.path, utils.GetMD5Hash(j))
+		err := d.downloadFile(fpath, j)
 		if err != nil {
 			log.Error("during segment download: segment='%s': %s", j, err)
 		}

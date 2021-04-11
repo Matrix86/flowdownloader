@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 
@@ -28,6 +29,7 @@ type Hlss struct {
 	secondaryIdx     []string
 	segments         []string
 	file             string
+	segmentsDir      string
 	pout             *os.File
 	resolutions      map[string]string
 	resKeys          []string
@@ -230,13 +232,18 @@ func (h *Hlss) parseSecondaryIndex() error {
 
 func (h *Hlss) downloadSegments() error {
 	log.Debug("downloading segments")
-	d := downloader.New(h.downloadWorker, ".", h.downloadCallback)
+	parentDir := os.TempDir()
+	segmentsDir, err := ioutil.TempDir(parentDir, "*-segments")
+	if err != nil {
+		return err
+	}
+	h.segmentsDir = segmentsDir
+	d := downloader.New(h.downloadWorker, segmentsDir, h.downloadCallback)
 	d.SetUrls(h.segments)
 	d.SetCookies(h.cookies)
 	d.SetReferer(h.referer)
-	d.StartDownload()
 
-	return nil
+	return d.StartDownload()
 }
 
 func (h *Hlss) decryptSegments() error {
@@ -254,20 +261,21 @@ func (h *Hlss) decryptSegments() error {
 
 	n := 0
 	for _, url := range h.segments {
-		name := utils.GetFileFromUrl(url)
+		name := utils.GetMD5Hash(url)
+		fpath := path.Join(h.segmentsDir, name)
 
 		if len(h.key) != 0 {
-			if err = utils.DecryptFileAppend(pout, name, h.key, h.iv); err != nil {
+			if err = utils.DecryptFileAppend(pout, fpath, h.key, h.iv); err != nil {
 				return err
 			}
 		} else {
 			// we assume that the segments are not encrypted
-			if err = utils.FileAppend(pout, name); err != nil {
+			if err = utils.FileAppend(pout, fpath); err != nil {
 				return err
 			}
 		}
 
-		os.Remove(name)
+		os.Remove(fpath)
 		n++
 
 		if h.decryptCallback != nil {
