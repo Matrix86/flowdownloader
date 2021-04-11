@@ -4,15 +4,15 @@
 
 {{range .Items -}}
 * [{{.CommitHashShort}}]({{.CommitURL}}) {{.Title}} ({{if .IsPull}}[contributed]({{.PullURL}}) by {{end}}[{{.Author}}]({{.AuthorURL}}))
-  {{end -}}
-  {{end -}}
-  {{end -}}
-  {{define "FlatTemplate" -}}
-  {{range .Items -}}
+{{end -}}
+{{end -}}
+{{end -}}
+{{define "FlatTemplate" -}}
+{{range .Items -}}
 * [{{.CommitHashShort}}]({{.CommitURL}}) {{.Title}} ({{if .IsPull}}[contributed]({{.PullURL}}) by {{end}}[{{.Author}}]({{.AuthorURL}}))
-  {{end -}}
-  {{end -}}
-  {{define "DefaultTemplate" -}}
+{{end -}}
+{{end -}}
+{{define "DefaultTemplate" -}}
 ## Release Note {{.Version}}
 {{if len .Grouped -}}
 {{template "GroupTemplate" . -}}   
