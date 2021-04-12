@@ -1,6 +1,6 @@
 {
 	"name": "Flowdownloader",
-	"version": "0.2",
+	"version": "0.3",
 	"description": "This extension allows you to download the HLS video and decrypt it on local using https://github.com/Matrix86/flowdownloader",
     "manifest_version": 3,
 
