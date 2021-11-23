@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -21,13 +22,19 @@ var rKeyUrl = regexp.MustCompile(`URI=\"([^\"]+)\"`)
 
 type DecryptCallback func(string, int, int)
 
+type Segment struct {
+	URL string
+	Key []byte
+	IV  []byte
+}
+
 type Hlss struct {
 	baseUrl          string
 	key              []byte
 	iv               []byte
 	mainIdx          string
 	secondaryIdx     []string
-	segments         []string
+	segments         []*Segment
 	file             string
 	segmentsDir      string
 	pout             *os.File
@@ -68,7 +75,8 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 
 	// Try to get key from URL
 	if keyUrl != "" {
-		err := obj.retrieveKeyFromURL(keyUrl)
+		var err error
+		obj.key, err = obj.retrieveKeyFromURL(keyUrl)
 		if err != nil {
 			return nil, err
 		}
@@ -85,20 +93,19 @@ func New(mainUrl string, key []byte, outputfile string, downloadCallback downloa
 	return &obj, nil
 }
 
-func (h *Hlss) retrieveKeyFromURL(keyUrl string) error {
+func (h *Hlss) retrieveKeyFromURL(keyUrl string) ([]byte, error) {
 	log.Debug("getting key from url: '%s'", keyUrl)
 	resp, err := utils.HttpRequest("GET", keyUrl, h.cookies, h.referer)
 	if err != nil {
-		return fmt.Errorf("http request error: %s", err)
+		return nil, fmt.Errorf("http request error: %s", err)
 	}
 	defer resp.Body.Close()
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Debug("key lenght: %d", len(buf))
-	h.key = buf
-	return nil
+	return buf, nil
 }
 
 func (h *Hlss) parseMainIndex() error {
@@ -171,11 +178,13 @@ func (h *Hlss) parseSecondaryIndex() error {
 	scanner.Split(bufio.ScanLines)
 
 	baseUrl := utils.GetBaseUrl(h.secondaryUrl)
+	baseURL, _ := url.Parse(baseUrl)
 
 	firstLine := true
 	getSegment := false
 	//keyUrl := ""
-	iv := ""
+	var key []byte
+	var iv []byte
 	for scanner.Scan() {
 		line := scanner.Text()
 		if firstLine && !strings.HasPrefix(line, "#EXTM3U") {
@@ -190,35 +199,48 @@ func (h *Hlss) parseSecondaryIndex() error {
 			line = line[len("#EXT-X-KEY:"):]
 
 			params := strings.Split(line, ",")
-			if len(params) < 2 {
-				return errors.New("Invalid m3u file format")
-			}
+			//if len(params) < 2 {
+			//	return errors.New("invalid m3u file format")
+			//}
 			for _, info := range params {
-				if h.key == nil && strings.HasPrefix(info, "URI=\"") {
+				if key == nil && strings.HasPrefix(info, "URI=\"") {
 					match := rKeyUrl.FindStringSubmatch(info)
 					if match != nil && len(match) >= 2 {
 						log.Debug("key URL found: %s", match[1])
-						err := h.retrieveKeyFromURL(match[1])
+						key, err = h.retrieveKeyFromURL(match[1])
 						if err != nil {
 							log.Error("retrieving Key from URL: %s", err)
 						}
 					}
 				} else if strings.HasPrefix(info, "IV=") {
-					iv = info[len("IV="):]
-					log.Debug("IV found: %s", iv)
-					h.iv, err = hex.DecodeString(iv[2:])
+					strIV := info[len("IV="):]
+					log.Debug("IV found: %s", strIV)
+					iv, err = hex.DecodeString(strIV[2:])
 					if err != nil {
 						return err
 					}
+				} else if strings.HasPrefix(info, "METHOD=NONE") {
+					key = nil
+					iv = nil
 				}
 			}
+		} else if strings.HasPrefix(line, "#EXT-X-DISCONTINUITY") {
+			key = nil
+			iv = nil
 		} else if strings.HasPrefix(line, "#") || line == "" {
 			continue
 		} else if getSegment {
+			segment := &Segment{
+				IV: iv,
+				Key: key,
+			}
 			if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
-				h.segments = append(h.segments, line)
+				segment.URL = line
+				h.segments = append(h.segments, segment)
 			} else {
-				h.segments = append(h.segments, baseUrl+line)
+				secondary, _ := baseURL.Parse(line)
+				segment.URL = secondary.String()
+				h.segments = append(h.segments, segment)
 			}
 			getSegment = false
 		}
@@ -239,7 +261,11 @@ func (h *Hlss) downloadSegments() error {
 	}
 	h.segmentsDir = segmentsDir
 	d := downloader.New(h.downloadWorker, segmentsDir, h.downloadCallback)
-	d.SetUrls(h.segments)
+	urls := make([]string, 0)
+	for _, s := range h.segments {
+		urls = append(urls, s.URL)
+	}
+	d.SetUrls(urls)
 	d.SetCookies(h.cookies)
 	d.SetReferer(h.referer)
 
@@ -260,12 +286,12 @@ func (h *Hlss) decryptSegments() error {
 	}
 
 	n := 0
-	for _, url := range h.segments {
-		name := utils.GetMD5Hash(url)
+	for _, segment := range h.segments {
+		name := utils.GetMD5Hash(segment.URL)
 		fpath := path.Join(h.segmentsDir, name)
 
-		if len(h.key) != 0 {
-			if err = utils.DecryptFileAppend(pout, fpath, h.key, h.iv); err != nil {
+		if len(segment.Key) != 0 {
+			if err = utils.DecryptFileAppend(pout, fpath, segment.Key, segment.IV); err != nil {
 				return err
 			}
 		} else {
@@ -320,7 +346,9 @@ func (h *Hlss) SetResolution(res_idx int) error {
 	if strings.HasPrefix(h.resolutions[h.resKeys[res_idx]], "http://") || strings.HasPrefix(h.resolutions[h.resKeys[res_idx]], "https://") {
 		h.secondaryUrl = h.resolutions[h.resKeys[res_idx]]
 	} else {
-		h.secondaryUrl = h.baseUrl + h.resolutions[h.resKeys[res_idx]]
+		baseURL, _ := url.Parse(h.baseUrl)
+		secondary, _ := baseURL.Parse(h.resolutions[h.resKeys[res_idx]])
+		h.secondaryUrl = secondary.String()
 	}
 
 	err := h.parseSecondaryIndex()

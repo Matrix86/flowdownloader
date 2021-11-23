@@ -43,6 +43,10 @@ func AesDecrypt(key []byte, encrypted []byte, iv []byte) (decoded []byte, err er
 		return
 	}
 
+	if iv == nil {
+		iv = make([]byte, aes.BlockSize)
+	}
+
 	stream := cipher.NewCBCDecrypter(block, iv)
 	stream.CryptBlocks(encrypted, encrypted)
 
